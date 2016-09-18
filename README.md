@@ -5,9 +5,13 @@
 
 ### Features
 
- - Live-reload source code when changes.
+ - Live-reloading source code changes.
  - Simple and efficient implementation by delegating heavy crunching to
    `watchman` [2].
+
+### Dependencies
+
+ - Developed and tested on `watchman` 4.6.0 and higher
 
 ### Platforms
 

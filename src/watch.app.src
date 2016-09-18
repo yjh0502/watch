@@ -10,7 +10,7 @@
   {env,[]},
   {modules, []},
 
-  {maintainers, []},
-  {licenses, []},
-  {links, []}
+  {maintainers,["Jihyun Yu"]},
+  {licenses,["BSD"]},
+  {links,[{"Github","https://github.com/yjh0502/watch"}]}
  ]}.
