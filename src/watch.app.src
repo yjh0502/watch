@@ -1,16 +1,11 @@
-{application, watch,
- [{description, "Live reloading with watchman"},
-  {vsn, "0.1.0"},
-  {registered, []},
-  {mod, { watch_app, []}},
-  {applications,
-   [kernel,
-    stdlib
-   ]},
-  {env,[]},
-  {modules, []},
-
-  {maintainers,["Jihyun Yu"]},
-  {licenses,["BSD"]},
-  {links,[{"Github","https://github.com/yjh0502/watch"}]}
- ]}.
+{application,watch,
+             [{description,"Live reloading with watchman"},
+              {vsn,"0.1.0"},
+              {registered,[]},
+              {mod,{watch_app,[]}},
+              {applications,[kernel,stdlib]},
+              {env,[]},
+              {modules,[]},
+              {maintainers,["Jihyun Yu"]},
+              {licenses,["BSD"]},
+              {links,[{"Github","https://github.com/yjh0502/watch"}]}]}.

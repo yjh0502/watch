@@ -17,15 +17,20 @@ start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 init([]) ->
-    %% TODO: not work on mac because lack of `stdbuf`
-    %% TODO: unix socket will be more portable, but there's no easy way to use unix socket in Erlang
-    P = open_port({spawn, "stdbuf -o0 watchman -p -j --server-encoding=json --output-encoding=bser"}, [binary, eof, use_stdio]),
-    port_command(P, cmd()),
-    {ok, #{
-        port => P,
-        data => <<>>,
-        len => 0
-    }}.
+    case os:find_executable("watchman") of
+        false ->
+            {stop, not_found};
+        ExecPath ->
+            P = open_port({spawn_executable, ExecPath},
+                [{args, ["-p", "-j", "--server-encoding=json", "--output-encoding=bser"]},
+                    binary, eof, use_stdio]),
+            port_command(P, cmd()),
+            {ok, #{
+                port => P,
+                data => <<>>,
+                len => 0
+            }}
+    end.
 
 handle_call(_Msg, _From, S) -> {reply, ok, S}.
 handle_cast(_Msg, State) -> {noreply, State}.

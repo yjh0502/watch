@@ -6,7 +6,7 @@
 ### Features
 
  - Live-reloading source code changes.
- - Simple and efficient implementation by delegating heavy crunching to
+ - Simple and efficient implementation by delegating heavy lifting to
    `watchman` [2].
 
 ### Dependencies
@@ -16,7 +16,7 @@
 ### Platforms
 
  - OTP 17 and higher.
- - Linux, FreeBSD
+ - Linux, FreeBSD, MacOS
  - MacOS is not supported yet because of lack of `stdbuf` command.
 
 
