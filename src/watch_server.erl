@@ -68,29 +68,34 @@ handle_data(State) ->
 handle_watchman_event(#{<<"subscribe">> := _Subscribe}, State) ->
     {ok, State};
 
-handle_watchman_event(#{<<"root">> := Root, <<"files">> := Files}, #{optmap := OptMap0} = State) ->
+handle_watchman_event(#{<<"root">> := Root, <<"files">> := Files} = _Ev, #{optmap := OptMap0} = State) ->
     NextOptMap = lists:foldl(fun(Filename, OptMap) ->
         {ok, Opts, OptMap2} = get_opt(Root, Filename, OptMap),
         NameStr = binary_to_list(filename:join(Root, Filename)),
-        case compile:file(NameStr, [binary, return | Opts]) of
-            {ok, Mod, ModBin, Warnings} ->
-                case code:get_object_code(Mod) of
-                    {_, ModBin, _} ->
-                        % skip reloading
-                        ok;
-                    _ ->
-                        print_results(NameStr, [], Warnings),
-                        case code:load_binary(Mod, NameStr, ModBin) of
-                            {module, Mod} ->
-                                compile:file(NameStr, Opts),
+        case filelib:last_modified(NameStr) of
+            0 ->
+                ok;
+            _ ->
+                case compile:file(NameStr, [binary, return | Opts]) of
+                    {ok, Mod, ModBin, Warnings} ->
+                        case code:get_object_code(Mod) of
+                            {_, ModBin, _} ->
+                                % skip reloading
                                 ok;
-                            {error, Reason} ->
-                                error_logger:info_msg(io_lib:format("~s:0: Failed to load file: ~s.~n", [NameStr, Reason]))
-                        end
-                end;
-            {error, Errors, Warnings} ->
-                print_results(NameStr, Errors, Warnings),
-                ok
+                            _ ->
+                                print_results(NameStr, [], Warnings),
+                                case code:load_binary(Mod, NameStr, ModBin) of
+                                    {module, Mod} ->
+                                        compile:file(NameStr, Opts),
+                                        ok;
+                                    {error, Reason} ->
+                                        error_logger:info_msg(io_lib:format("~s:0: Failed to load file: ~s.~n", [NameStr, Reason]))
+                                end
+                        end;
+                    {error, Errors, Warnings} ->
+                        print_results(NameStr, Errors, Warnings),
+                        ok
+                end
         end,
         OptMap2
     end, OptMap0, Files),
