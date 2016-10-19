@@ -68,13 +68,11 @@ handle_data(State) ->
 handle_watchman_event(#{<<"subscribe">> := _Subscribe}, State) ->
     {ok, State};
 
-handle_watchman_event(#{<<"root">> := Root, <<"files">> := Files}, #{optmap := OptMap} = State) ->
-    lists:foreach(fun(Filename) ->
-        Dir = filename:dirname(Filename),
-        FullDir = <<Root/binary, "/", Dir/binary>>,
-        NameStr = binary_to_list(<<Root/binary, "/", Filename/binary>>),
-        Opt = maps:get(FullDir, OptMap, []),
-        case compile:file(NameStr, [binary, return | Opt]) of
+handle_watchman_event(#{<<"root">> := Root, <<"files">> := Files}, #{optmap := OptMap0} = State) ->
+    NextOptMap = lists:foldl(fun(Filename, OptMap) ->
+        {ok, Opts, OptMap2} = get_opt(Root, Filename, OptMap),
+        NameStr = binary_to_list(filename:join(Root, Filename)),
+        case compile:file(NameStr, [binary, return | Opts]) of
             {ok, Mod, ModBin, Warnings} ->
                 case code:get_object_code(Mod) of
                     {_, ModBin, _} ->
@@ -84,7 +82,7 @@ handle_watchman_event(#{<<"root">> := Root, <<"files">> := Files}, #{optmap := O
                         print_results(NameStr, [], Warnings),
                         case code:load_binary(Mod, NameStr, ModBin) of
                             {module, Mod} ->
-                                compile:file(NameStr, Opt),
+                                compile:file(NameStr, Opts),
                                 ok;
                             {error, Reason} ->
                                 error_logger:info_msg(io_lib:format("~s:0: Failed to load file: ~s.~n", [NameStr, Reason]))
@@ -93,22 +91,16 @@ handle_watchman_event(#{<<"root">> := Root, <<"files">> := Files}, #{optmap := O
             {error, Errors, Warnings} ->
                 print_results(NameStr, Errors, Warnings),
                 ok
-        end
-    end, Files),
-    {ok, State};
+        end,
+        OptMap2
+    end, OptMap0, Files),
+    {ok, State#{optmap := NextOptMap}};
 
 handle_watchman_event(#{<<"root">> := Root, <<"files">> := Files}, State) ->
     % initial event
     OptMap = lists:foldl(fun(Filename, Acc) ->
-        ModName = filename:basename(Filename, <<".erl">>),
-        Mod = try binary_to_existing_atom(ModName, utf8) catch
-            error:_ -> '_undefined'
-        end,
-        case erlang:function_exported(Mod, module_info, 1) of
-            true ->
-                Opts = proplists:get_value(options, Mod:module_info(compile), []),
-                Dir = filename:dirname(Filename),
-                FullDir = <<Root/binary, "/", Dir/binary>>,
+        case get_opt(Root, Filename) of
+            {true, FullDir, Opts} ->
                 Acc#{FullDir => Opts};
             false ->
                 Acc
@@ -117,6 +109,45 @@ handle_watchman_event(#{<<"root">> := Root, <<"files">> := Files}, State) ->
     {ok, State#{
         optmap => OptMap
     }}.
+
+get_opt(Root, Filename, OptMap) ->
+    FullDir = dir(Root, Filename),
+    case maps:get(FullDir, OptMap, undefined) of
+        undefined ->
+            case get_opt(Root, Filename) of
+                {true, FullDir, Opts} ->
+                    {ok, Opts, OptMap#{FullDir=>Opts}};
+                false ->
+                    % fallback
+                    BaseDir = filename:dirname(FullDir),
+                    OutDir = filename:join(BaseDir, <<"ebin">>),
+                    IncludeDir = filename:join(BaseDir, <<"include">>),
+                    Opts = [{outdir, OutDir}, {i, BaseDir}, {i, IncludeDir}],
+                    {ok, Opts, OptMap}
+            end;
+        Opts ->
+            {ok, Opts, OptMap}
+    end.
+
+get_opt(Root, Filename) ->
+    ModName = filename:basename(Filename, <<".erl">>),
+    try binary_to_existing_atom(ModName, utf8) of
+        Mod ->
+            case erlang:function_exported(Mod, module_info, 1) of
+                true ->
+                    Opts = proplists:get_value(options, Mod:module_info(compile), []),
+                    FullDir = dir(Root, Filename),
+                    {true, FullDir, Opts};
+                false ->
+                    false
+            end
+    catch
+        error:_ -> false
+    end.
+
+dir(Root, Filename) ->
+    Dir = filename:dirname(Filename),
+    filename:join(Root, Dir).
 
 print_results(SrcFile, [], []) ->
     Msg = io_lib:format("~s:0: Recompiled.~n", [SrcFile]),
