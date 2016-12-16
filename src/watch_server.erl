@@ -94,6 +94,9 @@ handle_watchman_event(#{<<"root">> := Root, <<"files">> := Files} = _Ev, #{optma
                         end;
                     {error, Errors, Warnings} ->
                         print_results(NameStr, Errors, Warnings),
+                        ok;
+                    {error, Reason} ->
+                        error_logger:info_msg(io_lib:format("~s:0: Failed to load file: ~s.~n", [NameStr, Reason])),
                         ok
                 end
         end,
@@ -124,9 +127,11 @@ get_opt(Root, Filename, OptMap) ->
                     {ok, Opts, OptMap#{FullDir=>Opts}};
                 false ->
                     % fallback
-                    BaseDir = filename:dirname(FullDir),
-                    OutDir = filename:join(BaseDir, <<"ebin">>),
-                    IncludeDir = filename:join(BaseDir, <<"include">>),
+                    BaseDir = to_list(filename:dirname(FullDir)),
+                    OutDir = filename:join(BaseDir, "ebin"),
+                    IncludeDir = filename:join(BaseDir, "include"),
+                    % make output directory
+                    file:make_dir(OutDir),
                     Opts = [{outdir, OutDir}, {i, BaseDir}, {i, IncludeDir}],
                     {ok, Opts, OptMap}
             end;
@@ -152,7 +157,10 @@ get_opt(Root, Filename) ->
 
 dir(Root, Filename) ->
     Dir = filename:dirname(Filename),
-    filename:join(Root, Dir).
+    to_list(filename:join(Root, Dir)).
+
+to_list(Bin) when is_binary(Bin) -> binary_to_list(Bin);
+to_list(List) when is_list(List) -> List.
 
 print_results(SrcFile, [], []) ->
     Msg = io_lib:format("~s:0: Recompiled.~n", [SrcFile]),
