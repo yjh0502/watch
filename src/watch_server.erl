@@ -89,14 +89,14 @@ handle_watchman_event(#{<<"root">> := Root, <<"files">> := Files} = _Ev, #{optma
                                         compile:file(NameStr, Opts),
                                         ok;
                                     {error, Reason} ->
-                                        error_logger:info_msg(io_lib:format("~s:0: Failed to load file: ~s.~n", [NameStr, Reason]))
+                                        logger:info("~s:0: Failed to load file: ~s.~n", [NameStr, Reason])
                                 end
                         end;
                     {error, Errors, Warnings} ->
                         print_results(NameStr, Errors, Warnings),
                         ok;
                     {error, Reason} ->
-                        error_logger:info_msg(io_lib:format("~s:0: Failed to load file: ~s.~n", [NameStr, Reason])),
+                        logger:info("~s:0: Failed to load file: ~s.~n", [NameStr, Reason]),
                         ok
                 end
         end,
@@ -163,21 +163,20 @@ to_list(Bin) when is_binary(Bin) -> binary_to_list(Bin);
 to_list(List) when is_list(List) -> List.
 
 print_results(SrcFile, [], []) ->
-    Msg = io_lib:format("~s:0: Recompiled.~n", [SrcFile]),
-    error_logger:info_msg(Msg);
+    logger:info("~s:0: Recompiled.~n", [SrcFile]);
 
 print_results(SrcFile, [], Warnings) ->
     Msg = [
         format_errors(SrcFile, [], Warnings),
         io_lib:format("~s:0: Recompiled with ~p warnings~n", [SrcFile, length(Warnings)])
     ],
-    error_logger:warning_msg(Msg);
+    logger:warning(Msg);
 
 print_results(SrcFile, Errors, Warnings) ->
     Msg = [
         format_errors(SrcFile, Errors, Warnings)
     ],
-    error_logger:error_msg(Msg).
+    logger:error(Msg).
 
 %% Print error messages in a pretty and user readable way.
 format_errors(File, Errors, Warnings) ->
